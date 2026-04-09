@@ -36,10 +36,10 @@ float ooz;
 int xp, yp;
 int idx;
 
-const char colors[7] = {'@', '$', '~', '#', ';', '+', 'b'}; 
+const char colors[8] = {'@', '$', '~', '#', ';', '+', 'b', 'n'}; 
 
 void char_to_col(char ch) {
-	int escape_c[7] = {36, 35, 32, 31, 34, 33, 30};
+	int escape_c[8] = {36, 35, 32, 31, 34, 33, 30, 37};
 	int i = 0;
 
 	while(colors[i] != ch) {
@@ -112,7 +112,13 @@ void render_plane(struct point3 points[3], float len, char sym) {
   for (int i = 0; i <= len; i++) {
 		for (int j = 0; j <= len; j++) {
 			struct point3 cur_pt = grid_points[i][j];
-      calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, sym);
+      
+      // If its on the border of the plane, color it a different color
+      if (i == 0 || j == 0 || j == len || i == len) {
+        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, 'n');
+      } else {
+        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, sym);
+      }
 		}
 	}
 }
