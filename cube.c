@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "gridify.h"
+#include "rubiks.h"
 #define _GNU_SOURCE
 #define PI 3.14159265359f
 
@@ -36,7 +37,7 @@ float ooz;
 int xp, yp;
 int idx;
 
-const char colors[8] = {'@', '$', '~', '#', ';', '+', 'b', 'n'}; 
+const char colors[8] = {'@', '$', '~', '#', ';', '+', 'b', 'w'}; 
 
 void char_to_col(char ch) {
 	int escape_c[8] = {36, 35, 32, 31, 34, 33, 30, 37};
@@ -46,8 +47,7 @@ void char_to_col(char ch) {
 		i++;
 	}
 	sprintf(color_buffer + color_buf_itr, "\033[%im+", escape_c[i]);
-        color_buf_itr += 6;
-        //printf("%s", c);
+  color_buf_itr += 6;
 }
 
 float calculateX(struct point3 pt, float A, float B, float C) {
@@ -74,11 +74,29 @@ float calculateZ(struct point3 pt, float A, float B, float C) {
   return k * cos(A) * cos(B) - j * sin(A) * cos(B) + i * sin(B);
 }
 
+// rotates a point pt around the normal (unit) vector cw t radians
+struct point3 rotate_around_normal(struct point3 pt, struct point3 nor, float t) {
+  float i = pt.x;
+  float j = pt.y;
+  float k = pt.z;
+
+  float ux = nor.x;
+  float uy = nor.y;
+  float uz = nor.z;
+
+  float st = sin(t);
+  float ct = cos(t);
+  float mct = 1 - ct;
+
+  return (struct point3){i * (ux * ux * mct + ct) + j * (ux * uy * mct + uz * st) + k * (ux * uz * mct - uy * st),
+                         i * (ux * uy * mct - uz * st) + j * (uy * uy * mct + ct) + k * (uy * uz * mct + ux * st),
+                         i * (ux * uz * mct + uy * st) + j * (uy * uz * mct - ux * st) + k * (uz * uz * mct + ct)};
+}
+
 void add_color_char(char ch) {
     if (ch == ' ' || ch == '\n') {
 	      color_buffer[color_buf_itr] = ch;
         color_buf_itr++;
-        //printf("%c", ch);
     } else {
         char_to_col(ch);
     }
@@ -115,7 +133,7 @@ void render_plane(struct point3 points[3], float len, char sym) {
       
       // If its on the border of the plane, color it a different color
       if (i == 0 || j == 0 || j == len || i == len) {
-        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, 'n');
+        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, 'b');
       } else {
         calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, sym);
       }
@@ -149,14 +167,16 @@ void init_cube(struct point3 planes[6][3]) {
   planes[5][2] = (struct point3){5,4.999,-5};
 }
 
-struct point3 rotate_point(struct point3 pt) {
-  return (struct point3){calculateX(pt, UD_ang, LR_ang, ROT_ang), calculateY(pt, UD_ang, LR_ang, ROT_ang), calculateZ(pt, UD_ang, LR_ang, ROT_ang)};
+struct point3 rotate_point(struct point3 pt, float UD, float LR, float ROT) {
+  return (struct point3){calculateX(pt, UD, LR, ROT), 
+                         calculateY(pt, UD, LR, ROT), 
+                         calculateZ(pt, UD, LR, ROT)};
 }
 
 void rotate_cube(struct point3 planes[6][3]) {
   for (int i = 0; i < 6; i++) {
     for (int j = 0; j < 3; j++) {
-      planes[i][j] = rotate_point(planes[i][j]);
+      planes[i][j] = rotate_point(planes[i][j], UD_ang, LR_ang, ROT_ang);
     }
   }
 }
@@ -179,7 +199,7 @@ int main() {
     color_buf_itr = 0;
     
     calc_temp = clock();
-    render_plane(planes[0], 50, 'b'); // Cyan
+    render_plane(planes[0], 50, 'w'); // Cyan
     render_plane(planes[1], 50, '$'); // Purple
     render_plane(planes[2], 50, '~'); // Green
     render_plane(planes[3], 50, '#'); // Red

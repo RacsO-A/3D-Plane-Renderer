@@ -1,4 +1,4 @@
-#include 
+#include "gridify.h"
 
 struct plane {
 	struct point3 corner;
@@ -7,11 +7,13 @@ struct plane {
 	char symbol;
 };
 
+// Corner piece
 struct corner_p {
 	struct plane face[3];
 	struct plane internal[3];
 };
 
+// Edge piece
 struct edge_p {
 	struct plane face[2];
 	struct plane internal[2];
@@ -19,9 +21,12 @@ struct edge_p {
 
 // Green front white top
 // corners and edges are in order from:
-//	top to bottom, tr clockwise
+// top to bottom, tr clockwise
 // centers are top to bottom, tr clockwise
 struct cube {
+	// normal unit vectors to top, front, right
+	struct point3 normals[3];
+	
 	// 8 corners
 	// 	3 face planes
 	//	3 internal planes
