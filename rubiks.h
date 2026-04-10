@@ -3,7 +3,7 @@
 struct plane {
 	struct point3 corner;
 	struct point3 vertex[2];
-	struct point3 normal;
+	struct point3 normal; // unit
 	char symbol;
 };
 
@@ -44,3 +44,8 @@ struct cube {
 	// 0 if is currently doing a move, 1 when in static position
 	int is_static;
 };
+
+void plane_init(struct plane*, struct point3, struct point3, struct point3, struct point3, char);
+void edge_init(struct edge_p*, struct point3);
+void corner_init(struct corner_p*, struct point3);
+void cube_init(struct cube*);
