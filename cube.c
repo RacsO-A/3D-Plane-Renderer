@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <time.h>
-#include "gridify.h"
 #include "rubiks.h"
 #define _GNU_SOURCE
 #define PI 3.14159265359f
@@ -133,7 +132,7 @@ void render_plane(struct point3 points[3], float len, char sym) {
       
       // If its on the border of the plane, color it a different color
       if (i == 0 || j == 0 || j == len || i == len) {
-        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, 'b');
+        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, 'w');
       } else {
         calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, sym);
       }
@@ -173,10 +172,37 @@ struct point3 rotate_point(struct point3 pt, float UD, float LR, float ROT) {
                          calculateZ(pt, UD, LR, ROT)};
 }
 
-void rotate_cube(struct point3 planes[6][3]) {
-  for (int i = 0; i < 6; i++) {
+void rotate_plane(struct plane* p) {
+  p->corner = rotate_point(p->corner, UD_ang, LR_ang, ROT_ang);
+  p->vertex[0] = rotate_point(p->vertex[0], UD_ang, LR_ang, ROT_ang);
+  p->vertex[1] = rotate_point(p->vertex[1], UD_ang, LR_ang, ROT_ang);
+  p->normal = rotate_point(p->normal, UD_ang, LR_ang, ROT_ang);
+}
+
+void rotate_cube(struct cube* c) {
+  // Rotates all corners
+  for (int i = 0; i < 8; i++) {
+    // Rotates all planes in a corner
+    struct corner_p* cor = &(c->corners[i]);
     for (int j = 0; j < 3; j++) {
-      planes[i][j] = rotate_point(planes[i][j], UD_ang, LR_ang, ROT_ang);
+      rotate_plane(&(cor->face[j]));
+    }
+    for (int j = 0; j < 3; j++) {
+      rotate_plane(&(cor->internal[j]));
+    }
+  }
+}
+
+void render_cube(const struct cube* c) {
+  // Render all corners
+  for (int i = 0; i < 8; i++) {
+    // Renders all planes in a corner
+    struct corner_p cor = c->corners[i];
+    for (int j = 0; j < 3; j++) {
+      render_plane((struct point3[3]){cor.face[j].corner, cor.face[j].vertex[0], cor.face[j].vertex[1]}, 50, cor.face[j].symbol);
+    }
+    for (int j = 0; j < 3; j++) {
+      render_plane((struct point3[3]){cor.internal[j].corner, cor.internal[j].vertex[0], cor.internal[j].vertex[1]}, 50, cor.internal[j].symbol);
     }
   }
 }
@@ -185,11 +211,14 @@ int main() {
   total_time = clock();
   printf("\x1b[2J");
   
+  /*
   // 6 planes with 3 defining points
   struct point3 planes[6][3];
   init_cube(planes);
   rotate_cube(planes);
-
+  */
+  struct cube c;
+  cube_init(&c);
   int main_itr = 0;
 
   while (main_itr <= 200) {
@@ -199,16 +228,20 @@ int main() {
     color_buf_itr = 0;
     
     calc_temp = clock();
+    /*
     render_plane(planes[0], 50, 'w'); // Cyan
     render_plane(planes[1], 50, '$'); // Purple
     render_plane(planes[2], 50, '~'); // Green
     render_plane(planes[3], 50, '#'); // Red
     render_plane(planes[4], 50, ';'); // Cyan
     render_plane(planes[5], 50, '+'); // Yellow
+    */
+    render_cube(&c);
     render_time += (double)(clock() - calc_temp) / CLOCKS_PER_SEC;
 
     calc_temp = clock();
-    rotate_cube(planes);
+    //rotate_cube(planes);
+    rotate_cube(&c);
     calc_time += (double)(clock() - calc_temp) / CLOCKS_PER_SEC;
     /*
     // Renders the cube
