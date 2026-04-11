@@ -45,7 +45,11 @@ void char_to_col(char ch) {
 	while(colors[i] != ch) {
 		i++;
 	}
-	sprintf(color_buffer + color_buf_itr, "\033[%im+", escape_c[i]);
+  if (ch == 'w') {
+    sprintf(color_buffer + color_buf_itr, "\033[%im|", escape_c[i]);
+  } else {
+	  sprintf(color_buffer + color_buf_itr, "\033[%im|", escape_c[i]);
+  }
   color_buf_itr += 6;
 }
 
@@ -120,10 +124,16 @@ void calculateForStaticSurface(float cubeX, float cubeY, float cubeZ, int ch) {
   }
 }
 
-void render_plane(struct point3 points[3], float len, char sym) {
+void render_plane(struct plane* p, float len) {
+  
+  // If the plane's normal is pointed away, don't render
+  if (point3_dot((struct point3){0,0,1}, p->normal) > 0) {
+    return;
+  }
+  
   // Takes the 3 defining points and makes a len x len grid
   // of the plane that the 3 points make
-  struct point3** grid_points = gridify(points, len);
+  struct point3** grid_points = gridify((struct point3[3]){p->corner, p->vertex[0], p->vertex[1]}, len);
 	
   // Renders each point in the plane
   for (int i = 0; i <= len; i++) {
@@ -134,7 +144,7 @@ void render_plane(struct point3 points[3], float len, char sym) {
       if (i == 0 || j == 0 || j == len || i == len) {
         calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, 'w');
       } else {
-        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, sym);
+        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, p->symbol);
       }
 		}
 	}
@@ -193,16 +203,16 @@ void rotate_cube(struct cube* c) {
   }
 }
 
-void render_cube(const struct cube* c) {
+void render_cube(struct cube* c) {
   // Render all corners
   for (int i = 0; i < 8; i++) {
     // Renders all planes in a corner
-    struct corner_p cor = c->corners[i];
+    struct corner_p* cor = &(c->corners[i]);
     for (int j = 0; j < 3; j++) {
-      render_plane((struct point3[3]){cor.face[j].corner, cor.face[j].vertex[0], cor.face[j].vertex[1]}, 50, cor.face[j].symbol);
+      render_plane(&(cor->face[j]), 150);
     }
     for (int j = 0; j < 3; j++) {
-      render_plane((struct point3[3]){cor.internal[j].corner, cor.internal[j].vertex[0], cor.internal[j].vertex[1]}, 50, cor.internal[j].symbol);
+      render_plane(&(cor->internal[j]), 150);
     }
   }
 }
@@ -279,6 +289,7 @@ int main() {
     usleep(45000);
     main_itr++;
   }
+  printf("\033[0m");
   printf("\nPrint: %f, Total: %f\n", print_time, (double)(clock() - total_time) / CLOCKS_PER_SEC);
   printf("Render: %f, Rotation: %f\n", render_time, calc_time);
   return 0;

@@ -26,6 +26,11 @@ struct point3 point3_mult(float c, struct point3 p) {
 	return (struct point3){.x = p.x * c, .y = p.y * c, .z = p.z * c};
 }
 
+// Dot product of 2 points
+float point3_dot(struct point3 p1, struct point3 p2) {
+	return (p1.x * p2.x) + (p1.y * p2.y) + (p1.z * p2.z);
+}
+
 struct point3** point3_init_matrix(float len) {
 	struct point3** grid_points = malloc(sizeof(struct point3*) * len);
 	for (int i = 0; i < len; i++) {
