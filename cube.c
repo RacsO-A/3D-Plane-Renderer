@@ -15,31 +15,31 @@ double render_time = 0;
 clock_t temp;
 clock_t calc_temp;
 
-float UD_ang = 0.032341; // Up down
-float LR_ang = 0.014321; // Left right
-float ROT_ang = 0.041231; // Grab and spin left right
+double UD_ang = 0.032341; // Up down
+double LR_ang = 0.014321; // Left right
+double ROT_ang = 0.041231; // Grab and spin left right
 
-float cubeWidth = 10;
-int width = 160, height = 44;
-float zBuffer[160 * 44];
-char buffer[160 * 44];
-char color_buffer[160 * 44 * 10];
+double cubeWidth = 10;
+int width = 160, height = 50;
+double zBuffer[160 * 50];
+char buffer[160 * 50];
+char color_buffer[160 * 50 * 10];
 int color_buf_itr = 0;
 int backgroundASCIICode = ' ';
-int distanceFromCam = 25;
-float K1 = 40;
+int distanceFromCam = 40;
+double K1 = 60;
 
-float incrementSpeed = 0.6;
+double incrementSpeed = 0.6;
 
-float x, y, z;
-float ooz;
+double x, y, z;
+double oox;
 int xp, yp;
 int idx;
 
-const char colors[8] = {'@', '$', '~', '#', ';', '+', 'b', 'w'}; 
+const char colors[7] = {'b', 'o', 'g', 'r', 'y', 'B', 'w'}; 
 
 void char_to_col(char ch) {
-	int escape_c[8] = {36, 35, 32, 31, 34, 33, 30, 37};
+	int escape_c[7] = {34, 35, 32, 31, 33, 30, 37};
 	int i = 0;
 
 	while(colors[i] != ch) {
@@ -53,47 +53,76 @@ void char_to_col(char ch) {
   color_buf_itr += 6;
 }
 
-float calculateX(struct point3 pt, float A, float B, float C) {
-  float i = pt.x;
-  float j = pt.y;
-  float k = pt.z;
-  return j * sin(A) * sin(B) * cos(C) - k * cos(A) * sin(B) * cos(C) +
+double calculateX(struct point3* pt, double B, double C, double A) {
+  double i = pt->x;
+  double j = pt->y;
+  double k = pt->z;
+  return j * sin(A) * sin(B) * cos(C) + k * cos(A) * sin(B) * cos(C) -
          j * cos(A) * sin(C) + k * sin(A) * sin(C) + i * cos(B) * cos(C);
 }
 
-float calculateY(struct point3 pt, float A, float B, float C) {
-  float i = pt.x;
-  float j = pt.y;
-  float k = pt.z;
-  return j * cos(A) * cos(C) + k * sin(A) * cos(C) -
-         j * sin(A) * sin(B) * sin(C) + k * cos(A) * sin(B) * sin(C) -
+double calculateY(struct point3* pt, double B, double C, double A) {
+  double i = pt->x;
+  double j = pt->y;
+  double k = pt->z;
+  return j * cos(A) * cos(C) - k * sin(A) * cos(C) +
+         j * sin(A) * sin(B) * sin(C) + k * cos(A) * sin(B) * sin(C) +
          i * cos(B) * sin(C);
 }
 
-float calculateZ(struct point3 pt, float A, float B, float C) {
-  float i = pt.x;
-  float j = pt.y;
-  float k = pt.z;
-  return k * cos(A) * cos(B) - j * sin(A) * cos(B) + i * sin(B);
+double calculateZ(struct point3* pt, double B, double C, double A) {
+  double i = pt->x;
+  double j = pt->y;
+  double k = pt->z;
+  return k * cos(A) * cos(B) + j * sin(A) * cos(B) - i * sin(B);
 }
 
 // rotates a point pt around the normal (unit) vector cw t radians
-struct point3 rotate_around_normal(struct point3 pt, struct point3 nor, float t) {
-  float i = pt.x;
-  float j = pt.y;
-  float k = pt.z;
+void rotate_around_normal(struct point3* pt, struct point3 nor, double t) {
+  double i = pt->x;
+  double j = pt->y;
+  double k = pt->z;
 
-  float ux = nor.x;
-  float uy = nor.y;
-  float uz = nor.z;
+  double ux = nor.x;
+  double uy = nor.y;
+  double uz = nor.z;
 
-  float st = sin(t);
-  float ct = cos(t);
-  float mct = 1 - ct;
+  double st = sin(t);
+  double ct = cos(t);
+  double mct = 1 - ct;
 
-  return (struct point3){i * (ux * ux * mct + ct) + j * (ux * uy * mct + uz * st) + k * (ux * uz * mct - uy * st),
-                         i * (ux * uy * mct - uz * st) + j * (uy * uy * mct + ct) + k * (uy * uz * mct + ux * st),
-                         i * (ux * uz * mct + uy * st) + j * (uy * uz * mct - ux * st) + k * (uz * uz * mct + ct)};
+  pt->x = i * (ux * ux * mct + ct) + j * (ux * uy * mct - uz * st) + k * (ux * uz * mct + uy * st);
+  pt->y = i * (ux * uy * mct + uz * st) + j * (uy * uy * mct + ct) + k * (uy * uz * mct - ux * st);
+  pt->z = i * (ux * uz * mct - uy * st) + j * (uy * uz * mct + ux * st) + k * (uz * uz * mct + ct);
+}
+
+void move_R(struct cube* c) {
+  // Rotate corners
+  int c_idx[4] = {1, 2, 5, 6};
+  struct point3 normal = c->normals[1];
+  for (int i = 0; i < 4; i++) {
+    struct corner_p* cor = &(c->corners[c_idx[i]]);
+    for (int j = 0; j < 3; j++) {
+      struct plane* cur_plane = &(cor->face[j]);
+      rotate_around_normal(&(cur_plane->corner), normal, -PI / 12);
+      rotate_around_normal(&(cur_plane->vertex[0]), normal, -PI / 12);
+      rotate_around_normal(&(cur_plane->vertex[1]), normal, -PI / 12);
+      rotate_around_normal(&(cur_plane->normal), normal, -PI / 12);
+    }
+    for (int j = 0; j < 3; j++) {
+      struct plane* cur_plane = &(cor->internal[j]);
+      rotate_around_normal(&(cur_plane->corner), normal, -PI / 12);
+      rotate_around_normal(&(cur_plane->vertex[0]), normal, -PI / 12);
+      rotate_around_normal(&(cur_plane->vertex[1]), normal, -PI / 12);
+      rotate_around_normal(&(cur_plane->normal), normal, -PI / 12);
+    }
+  }
+
+  // Rotate center
+  struct plane* center_pl = &(c->centers[2]);
+  rotate_around_normal(&(center_pl->corner), normal, -PI / 12);
+  rotate_around_normal(&(center_pl->vertex[0]), normal, -PI / 12);
+  rotate_around_normal(&(center_pl->vertex[1]), normal, -PI / 12);
 }
 
 void add_color_char(char ch) {
@@ -105,29 +134,28 @@ void add_color_char(char ch) {
     }
 }
 
-void calculateForStaticSurface(float cubeX, float cubeY, float cubeZ, int ch) {
-  x = cubeX;
+void calculateForStaticSurface(double cubeX, double cubeY, double cubeZ, int ch) {
+  x = distanceFromCam - cubeX;
   y = cubeY;
-  z = cubeZ + distanceFromCam;
+  z = cubeZ;
 
-  ooz = 1 / z;
+  oox = 1 / x;
 
-  xp = (int)(width / 2 + K1 * ooz * x * 2);
-  yp = (int)(height / 2 + K1 * ooz * y);
+  xp = (int)(width / 2 + K1 * oox * y * 2);
+  yp = (int)(height / 2 + K1 * oox * z);
 
-  idx = xp + yp * width;
+  idx = xp + (height - yp) * width;
   if (idx >= 0 && idx < width * height) {
-    if (ooz > zBuffer[idx]) {
-      zBuffer[idx] = ooz;
+    if (oox > zBuffer[idx]) {
+      zBuffer[idx] = oox;
       buffer[idx] = ch;
     }
   }
 }
 
-void render_plane(struct plane* p, float len) {
-  
+void render_plane(struct plane* p, double len) {
   // If the plane's normal is pointed away, don't render
-  if (point3_dot((struct point3){0,0,1}, p->normal) > 0) {
+  if (point3_dot((struct point3){-1, 0, 0}, p->normal) > 0) {
     return;
   }
   
@@ -150,43 +178,47 @@ void render_plane(struct plane* p, float len) {
 	}
 }
 
-void init_cube(struct point3 planes[6][3]) {
-  planes[0][0] = (struct point3){5,5,-5};
-  planes[0][1] = (struct point3){5,-5,-5};
-  planes[0][2] = (struct point3){-5,5,-5};
-
-  planes[1][0] = (struct point3){5,5,5};
-  planes[1][1] = (struct point3){5,-5,5};
-  planes[1][2] = (struct point3){-5,5,5};
-
-  planes[2][0] = (struct point3){5,-4.999,5};
-  planes[2][1] = (struct point3){-5,-5,5};
-  planes[2][2] = (struct point3){5,-5,-5};
-
-  planes[3][0] = (struct point3){5,4.999,5};
-  planes[3][1] = (struct point3){-5,5,5};
-  planes[3][2] = (struct point3){5,5,-5};
-
-  planes[4][0] = (struct point3){-5,5,5};
-  planes[4][1] = (struct point3){-5,-5,5};
-  planes[4][2] = (struct point3){-5,4.999,-5};
-
-  planes[5][0] = (struct point3){5,5,5};
-  planes[5][1] = (struct point3){5,-5,5};
-  planes[5][2] = (struct point3){5,4.999,-5};
-}
-
-struct point3 rotate_point(struct point3 pt, float UD, float LR, float ROT) {
-  return (struct point3){calculateX(pt, UD, LR, ROT), 
-                         calculateY(pt, UD, LR, ROT), 
-                         calculateZ(pt, UD, LR, ROT)};
+void rotate_point(struct point3* pt, double UD, double LR, double ROT) {
+  *pt = (struct point3){calculateX(pt, UD, LR, ROT), 
+                        calculateY(pt, UD, LR, ROT), 
+                        calculateZ(pt, UD, LR, ROT)};
 }
 
 void rotate_plane(struct plane* p) {
-  p->corner = rotate_point(p->corner, UD_ang, LR_ang, ROT_ang);
-  p->vertex[0] = rotate_point(p->vertex[0], UD_ang, LR_ang, ROT_ang);
-  p->vertex[1] = rotate_point(p->vertex[1], UD_ang, LR_ang, ROT_ang);
-  p->normal = rotate_point(p->normal, UD_ang, LR_ang, ROT_ang);
+  rotate_point(&(p->corner), UD_ang, LR_ang, ROT_ang);
+  rotate_point(&(p->vertex[0]), UD_ang, LR_ang, ROT_ang);
+  rotate_point(&(p->vertex[1]), UD_ang, LR_ang, ROT_ang);
+  rotate_point(&(p->normal), UD_ang, LR_ang, ROT_ang);
+}
+
+void rotate_cube_ang(struct cube* c, double UD, double LR, double ROT) {
+  double t1 = UD_ang;
+  double t2 = LR_ang;
+  double t3 = ROT_ang;
+  UD_ang = UD;
+  LR_ang = LR;
+  ROT_ang = ROT;
+
+  // Rotates all corners
+  for (int i = 0; i < 8; i++) {
+    // Rotates all planes in a corner
+    struct corner_p* cor = &(c->corners[i]);
+    for (int j = 0; j < 3; j++) {
+      rotate_plane(&(cor->face[j]));
+    }
+    for (int j = 0; j < 3; j++) {
+      rotate_plane(&(cor->internal[j]));
+    }
+  }
+
+  // Rotate all centers
+  for (int i = 0; i < 6; i++) {
+    rotate_plane(&(c->centers[i]));
+  }
+
+  UD_ang = t1;
+  LR_ang = t2;
+  ROT_ang = t3;
 }
 
 void rotate_cube(struct cube* c) {
@@ -201,6 +233,17 @@ void rotate_cube(struct cube* c) {
       rotate_plane(&(cor->internal[j]));
     }
   }
+
+  // Rotate all centers
+  for (int i = 0; i < 6; i++) {
+    rotate_plane(&(c->centers[i]));
+  }
+
+  // Rotates all normals
+  for (int i = 0; i < 3; i++) {
+    rotate_point(&(c->normals[i]), UD_ang, LR_ang, ROT_ang);
+  }
+    
 }
 
 void render_cube(struct cube* c) {
@@ -209,11 +252,16 @@ void render_cube(struct cube* c) {
     // Renders all planes in a corner
     struct corner_p* cor = &(c->corners[i]);
     for (int j = 0; j < 3; j++) {
-      render_plane(&(cor->face[j]), 150);
+      render_plane(&(cor->face[j]), 50);
     }
     for (int j = 0; j < 3; j++) {
-      render_plane(&(cor->internal[j]), 150);
+      render_plane(&(cor->internal[j]), 50);
     }
+  }
+
+  // Render all centers
+  for (int i = 0; i < 6; i++) {
+    render_plane(&(c->centers[i]), 50);
   }
 }
 
@@ -221,47 +269,24 @@ int main() {
   total_time = clock();
   printf("\x1b[2J");
   
-  /*
-  // 6 planes with 3 defining points
-  struct point3 planes[6][3];
-  init_cube(planes);
-  rotate_cube(planes);
-  */
   struct cube c;
   cube_init(&c);
   int main_itr = 0;
 
-  while (main_itr <= 200) {
+  while (main_itr <= 12 * 201) {
     memset(buffer, backgroundASCIICode, width * height);
-    memset(zBuffer, 0, width * height * 4);
+    memset(zBuffer, 0, width * height * 8);
     memset(color_buffer, backgroundASCIICode, width * height * 10);
     color_buf_itr = 0;
     
     calc_temp = clock();
-    /*
-    render_plane(planes[0], 50, 'w'); // Cyan
-    render_plane(planes[1], 50, '$'); // Purple
-    render_plane(planes[2], 50, '~'); // Green
-    render_plane(planes[3], 50, '#'); // Red
-    render_plane(planes[4], 50, ';'); // Cyan
-    render_plane(planes[5], 50, '+'); // Yellow
-    */
     render_cube(&c);
     render_time += (double)(clock() - calc_temp) / CLOCKS_PER_SEC;
 
     calc_temp = clock();
-    //rotate_cube(planes);
+    move_R(&c);
     rotate_cube(&c);
     calc_time += (double)(clock() - calc_temp) / CLOCKS_PER_SEC;
-    /*
-    // Renders the cube
-    calculateForStaticSurface(cubeX, cubeY, -cubeWidth, '@'); // Cyan
-    calculateForStaticSurface(cubeWidth, cubeY, cubeX, '$'); // Purple
-    calculateForStaticSurface(-cubeWidth, cubeY, -cubeX, '~'); // Green
-    calculateForStaticSurface(-cubeX, cubeY, cubeWidth, '#'); // Red
-    calculateForStaticSurface(cubeX, -cubeWidth, -cubeY, ';');
-    calculateForStaticSurface(cubeX, cubeWidth, cubeY, '+');
-    */
 
     printf("\x1b[H");
 
@@ -286,6 +311,7 @@ int main() {
         B += PI / 12;
     }
     */
+
     usleep(45000);
     main_itr++;
   }

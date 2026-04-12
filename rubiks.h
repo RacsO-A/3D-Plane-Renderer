@@ -24,7 +24,7 @@ struct edge_p {
 // top to bottom, tr clockwise
 // centers are top to bottom, tr clockwise
 struct cube {
-	// normal unit vectors to top, front, right
+	// normal unit vectors to top, right, front
 	struct point3 normals[3];
 	
 	// 8 corners
