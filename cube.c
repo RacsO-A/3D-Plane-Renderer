@@ -156,6 +156,7 @@ void calculateForStaticSurface(double cubeX, double cubeY, double cubeZ, int ch)
 int get_render_width(struct plane* p) {
   double x;
   double y;
+  // Use the closest point to the camera to overestimate
   if (p->corner.x > p->vertex[0].x && p->corner.x > p->vertex[1].x) {
     x = p->corner.x;
     y = p->corner.y;
@@ -169,8 +170,11 @@ int get_render_width(struct plane* p) {
 
   double oox1 = 1 / (distanceFromCam - x);
   
+  // Calculate the distance it would be on the screen. Worse
+  // case when the plane would be diagonal so along the diag
+  // it would be piece_size * sqrt(2) ~ piece_size * 1.5
   int x1 = (int)(width / 2 + K1 * oox1 * y * 2);
-  int x2 = (int)(width / 2 + K1 * oox1 * (y + piece_size) * 2);
+  int x2 = (int)(width / 2 + K1 * oox1 * (y + piece_size * 1.5) * 2);
   return x2 - x1;
 }
 
@@ -180,7 +184,7 @@ void render_plane(struct plane* p) {
     return;
   }
   
-  int len = get_render_width(p) + 3;
+  int len = get_render_width(p); 
 
   // Takes the 3 defining points and makes a len x len grid
   // of the plane that the 3 points make
@@ -199,6 +203,11 @@ void render_plane(struct plane* p) {
       }
 		}
 	}
+  
+  for (int i = 0; i <= len; i++) {
+    free(grid_points[i]);
+  }
+  free(grid_points);
 }
 
 void rotate_point(struct point3* pt, double UD, double LR, double ROT) {
@@ -266,7 +275,6 @@ void rotate_cube(struct cube* c) {
   for (int i = 0; i < 3; i++) {
     rotate_point(&(c->normals[i]), UD_ang, LR_ang, ROT_ang);
   }
-    
 }
 
 void render_cube(struct cube* c) {
@@ -335,7 +343,7 @@ int main() {
     }
     */
 
-    usleep(45000);
+    //usleep(45000);
     main_itr++;
   }
   printf("\033[0m");
