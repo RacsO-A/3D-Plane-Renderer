@@ -1,5 +1,4 @@
 #include "rubiks.h"
-double piece_size = 5;
 
 void plane_init(struct plane* p, struct point3 corner, struct point3 v1, struct point3 v2, struct point3 normal, char sym) {
 	p->symbol = sym;

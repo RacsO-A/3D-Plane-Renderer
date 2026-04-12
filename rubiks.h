@@ -1,4 +1,5 @@
 #include "gridify.h"
+#define piece_size 5.0f
 
 struct plane {
 	struct point3 corner;

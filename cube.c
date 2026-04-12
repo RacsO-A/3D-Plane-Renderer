@@ -153,12 +153,35 @@ void calculateForStaticSurface(double cubeX, double cubeY, double cubeZ, int ch)
   }
 }
 
-void render_plane(struct plane* p, double len) {
+int get_render_width(struct plane* p) {
+  double x;
+  double y;
+  if (p->corner.x > p->vertex[0].x && p->corner.x > p->vertex[1].x) {
+    x = p->corner.x;
+    y = p->corner.y;
+  } else if (p->vertex[0].x > p->corner.x && p->vertex[0].x > p->vertex[1].x) {
+    x = p->vertex[0].x;
+    y = p->vertex[0].y;
+  } else {
+    x = p->vertex[1].x;
+    y = p->vertex[1].y;
+  }
+
+  double oox1 = 1 / (distanceFromCam - x);
+  
+  int x1 = (int)(width / 2 + K1 * oox1 * y * 2);
+  int x2 = (int)(width / 2 + K1 * oox1 * (y + piece_size) * 2);
+  return x2 - x1;
+}
+
+void render_plane(struct plane* p) {
   // If the plane's normal is pointed away, don't render
   if (point3_dot((struct point3){-1, 0, 0}, p->normal) > 0) {
     return;
   }
   
+  int len = get_render_width(p) + 3;
+
   // Takes the 3 defining points and makes a len x len grid
   // of the plane that the 3 points make
   struct point3** grid_points = gridify((struct point3[3]){p->corner, p->vertex[0], p->vertex[1]}, len);
@@ -252,16 +275,16 @@ void render_cube(struct cube* c) {
     // Renders all planes in a corner
     struct corner_p* cor = &(c->corners[i]);
     for (int j = 0; j < 3; j++) {
-      render_plane(&(cor->face[j]), 50);
+      render_plane(&(cor->face[j]));
     }
     for (int j = 0; j < 3; j++) {
-      render_plane(&(cor->internal[j]), 50);
+      render_plane(&(cor->internal[j]));
     }
   }
 
   // Render all centers
   for (int i = 0; i < 6; i++) {
-    render_plane(&(c->centers[i]), 50);
+    render_plane(&(c->centers[i]));
   }
 }
 
@@ -273,7 +296,7 @@ int main() {
   cube_init(&c);
   int main_itr = 0;
 
-  while (main_itr <= 12 * 201) {
+  while (main_itr <= 12 * 20) {
     memset(buffer, backgroundASCIICode, width * height);
     memset(zBuffer, 0, width * height * 8);
     memset(color_buffer, backgroundASCIICode, width * height * 10);
