@@ -19,7 +19,6 @@ double UD_ang = 0.032341; // Up down
 double LR_ang = 0.014321; // Left right
 double ROT_ang = 0.041231; // Grab and spin left right
 
-double cubeWidth = 10;
 int width = 160, height = 50;
 double zBuffer[160 * 50];
 char buffer[160 * 50];
@@ -28,8 +27,7 @@ int color_buf_itr = 0;
 int backgroundASCIICode = ' ';
 int distanceFromCam = 40;
 double K1 = 60;
-
-double incrementSpeed = 0.6;
+int prev_char = ' ';
 
 double x, y, z;
 double oox;
@@ -45,12 +43,10 @@ void char_to_col(char ch) {
 	while(colors[i] != ch) {
 		i++;
 	}
-  if (ch == 'w') {
-    sprintf(color_buffer + color_buf_itr, "\033[%im|", escape_c[i]);
-  } else {
-	  sprintf(color_buffer + color_buf_itr, "\033[%im|", escape_c[i]);
-  }
+
+	sprintf(color_buffer + color_buf_itr, "\033[%im|", escape_c[i]);
   color_buf_itr += 6;
+  prev_char = ch;
 }
 
 double calculateX(struct point3* pt, double B, double C, double A) {
@@ -128,6 +124,9 @@ void move_R(struct cube* c) {
 void add_color_char(char ch) {
     if (ch == ' ' || ch == '\n') {
 	      color_buffer[color_buf_itr] = ch;
+        color_buf_itr++;
+    } else if (ch == prev_char) {
+      	color_buffer[color_buf_itr] = '|';
         color_buf_itr++;
     } else {
         char_to_col(ch);
@@ -304,7 +303,7 @@ int main() {
   cube_init(&c);
   int main_itr = 0;
 
-  while (main_itr <= 12 * 20) {
+  while (main_itr <= 12 * 500) {
     memset(buffer, backgroundASCIICode, width * height);
     memset(zBuffer, 0, width * height * 8);
     memset(color_buffer, backgroundASCIICode, width * height * 10);
