@@ -12,8 +12,10 @@ double print_time = 0;
 double calc_time = 0;
 double total_time = 0;
 double render_time = 0;
+double static_time = 0;
 clock_t temp;
 clock_t calc_temp;
+clock_t static_temp;
 
 double UD_ang = 0.032341; // Up down
 double LR_ang = 0.014321; // Left right
@@ -134,6 +136,7 @@ void add_color_char(char ch) {
 }
 
 void calculateForStaticSurface(double cubeX, double cubeY, double cubeZ, int ch) {
+  static_temp = clock();
   x = distanceFromCam - cubeX;
   y = cubeY;
   z = cubeZ;
@@ -150,6 +153,7 @@ void calculateForStaticSurface(double cubeX, double cubeY, double cubeZ, int ch)
       buffer[idx] = ch;
     }
   }
+  static_time += (double)(clock() - static_temp) / CLOCKS_PER_SEC;
 }
 
 int get_render_width(struct plane* p) {
@@ -303,7 +307,7 @@ int main() {
   cube_init(&c);
   int main_itr = 0;
 
-  while (main_itr <= 12 * 500) {
+  while (main_itr <= 12 * 20) {
     memset(buffer, backgroundASCIICode, width * height);
     memset(zBuffer, 0, width * height * 8);
     memset(color_buffer, backgroundASCIICode, width * height * 10);
@@ -342,11 +346,11 @@ int main() {
     }
     */
 
-    //usleep(45000);
+    usleep(45000);
     main_itr++;
   }
   printf("\033[0m");
   printf("\nPrint: %f, Total: %f\n", print_time, (double)(clock() - total_time) / CLOCKS_PER_SEC);
-  printf("Render: %f, Rotation: %f\n", render_time, calc_time);
+  printf("Total Render: %f, Rotation: %f, Projection: %f\n", render_time, calc_time, static_time);
   return 0;
 }
