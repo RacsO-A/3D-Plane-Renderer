@@ -1,4 +1,130 @@
 #include "rubiks.h"
+#define PI 3.14159265359f
+
+double UD_ang = 0.032341; // Up down
+double LR_ang = 0.014321; // Left right
+double ROT_ang = 0.041231; // Grab and spin left right
+
+void rotate_plane_around_normal(struct plane* p, struct point3 nor, double t) {
+    rotate_around_normal(&(p->corner), nor, t);
+	rotate_around_normal(&(p->vertex[0]), nor, t);
+	rotate_around_normal(&(p->vertex[1]), nor, t);
+	rotate_around_normal(&(p->normal), nor, t);
+}
+
+void rotate_plane(struct plane* p) {
+	rotate_point(&(p->corner), UD_ang, LR_ang, ROT_ang);
+	rotate_point(&(p->vertex[0]), UD_ang, LR_ang, ROT_ang);
+	rotate_point(&(p->vertex[1]), UD_ang, LR_ang, ROT_ang);
+	rotate_point(&(p->normal), UD_ang, LR_ang, ROT_ang);
+}
+
+void rotate_cube_ang(struct cube* c, double UD, double LR, double ROT) {
+	double t1 = UD_ang;
+	double t2 = LR_ang;
+	double t3 = ROT_ang;
+	UD_ang = UD;
+	LR_ang = LR;
+	ROT_ang = ROT;
+
+	// Rotates all corners
+	for (int i = 0; i < 8; i++) {
+		// Rotates all planes in a corner
+		struct corner_p* cor = &(c->corners[i]);
+		for (int j = 0; j < 3; j++) {
+		rotate_plane(&(cor->face[j]));
+		}
+		for (int j = 0; j < 3; j++) {
+		rotate_plane(&(cor->internal[j]));
+		}
+	}
+
+	// Rotates all edges
+	for (int i = 0; i < 12; i++) {
+		// Rotates all planes in an edge
+		struct edge_p* edge = &(c->edges[i]);
+		for (int j = 0; j < 2; j++) {
+		rotate_plane(&(edge->face[j]));
+		}
+		for (int j = 0; j < 2; j++) {
+		rotate_plane(&(edge->internal[j]));
+		}
+	}
+
+	// Rotate all centers
+	for (int i = 0; i < 6; i++) {
+		rotate_plane(&(c->centers[i]));
+	}
+
+	UD_ang = t1;
+	LR_ang = t2;
+	ROT_ang = t3;
+}
+
+void rotate_cube(struct cube* c) {
+	// Rotates all corners
+	for (int i = 0; i < 8; i++) {
+		// Rotates all planes in a corner
+		struct corner_p* cor = &(c->corners[i]);
+		for (int j = 0; j < 3; j++) {
+		rotate_plane(&(cor->face[j]));
+		}
+		for (int j = 0; j < 3; j++) {
+		rotate_plane(&(cor->internal[j]));
+		}
+	}
+
+	// Rotates all edges
+	for (int i = 0; i < 12; i++) {
+		// Rotates all planes in an edge
+		struct edge_p* edge = &(c->edges[i]);
+		for (int j = 0; j < 2; j++) {
+		rotate_plane(&(edge->face[j]));
+		}
+		for (int j = 0; j < 2; j++) {
+		rotate_plane(&(edge->internal[j]));
+		}
+	}
+
+	// Rotate all centers
+	for (int i = 0; i < 6; i++) {
+		rotate_plane(&(c->centers[i]));
+	}
+
+	// Rotates all normals
+	for (int i = 0; i < 3; i++) {
+		rotate_point(&(c->normals[i]), UD_ang, LR_ang, ROT_ang);
+	}
+}
+
+void rotate_edge_ang(struct edge_p* e, double UD, double LR, double ROT) {
+	double t1 = UD_ang;
+	double t2 = LR_ang;
+	double t3 = ROT_ang;
+	UD_ang = UD;
+	LR_ang = LR;
+	ROT_ang = ROT;
+
+	for (int j = 0; j < 2; j++) {
+		rotate_plane(&(e->face[j]));
+	}
+	for (int j = 0; j < 2; j++) {
+		rotate_plane(&(e->internal[j]));
+	}
+
+	UD_ang = t1;
+	LR_ang = t2;
+	ROT_ang = t3;
+}
+
+// Deep copies p -> copy
+void plane_copy(struct plane* p, struct plane* copy) {
+	copy->symbol = p->symbol;
+	copy->normal = p->normal;
+	copy->corner = p->corner;
+	copy->vertex[0] = p->vertex[0];
+	copy->vertex[1] = p->vertex[1];
+}
 
 void plane_init(struct plane* p, struct point3 corner, struct point3 v1, struct point3 v2, struct point3 normal, char sym) {
 	p->symbol = sym;
@@ -34,11 +160,67 @@ void center_init(struct plane* p, struct point3 center, char color) {
 	plane_init(p, corner, v1, v2, normal, color);
 }
 
-void edge_init(struct edge_p* e, struct point3 center) {
+const char colorss[6] = {'b', 'o', 'g', 'r', 'y', 'w'}; 
 
+// Deep copies e -> copy
+void edge_p_copy(struct edge_p* e, struct edge_p* copy) {
+	plane_copy(&(e->face[0]), &(copy->face[0]));
+	plane_copy(&(e->face[1]), &(copy->face[1]));
+	e->face[0].symbol = colorss[rand() % 6];
+	e->face[1].symbol = colorss[rand() % 6];
+
+	plane_copy(&(e->internal[0]), &(copy->internal[0]));
+	plane_copy(&(e->internal[1]), &(copy->internal[1]));
 }
 
-const char colorss[6] = {'b', 'o', 'g', 'r', 'y', 'w'}; 
+void all_edge_init(struct cube* c) {
+	struct point3 offset = {0, piece_size, 0};
+	struct point3 e1 = {1.5 * piece_size, -0.5 * piece_size, 1.5 * piece_size};
+	struct point3 b1 = {0.5 * piece_size, -0.5 * piece_size, 1.5 * piece_size};
+	struct point3 f1 = {1.5 * piece_size, -0.5 * piece_size, 0.5 * piece_size};
+	
+	struct point3 e2 = point3_add(e1, offset);
+	struct point3 b2 = point3_add(b1, offset);
+	struct point3 f2 = point3_add(f1, offset);
+
+	// Init the template edge
+	struct edge_p template_e;
+	plane_init(&(template_e.face[0]), 
+	           e1, e2, b1, (struct point3){0, 0, 1}, 
+			   colorss[rand() % 6]);
+	plane_init(&(template_e.face[1]), 
+	           e1, e2, f1, (struct point3){1, 0, 0}, 
+			   colorss[rand() % 6]);
+
+	plane_init(&(template_e.internal[0]), 
+	           e1, b1, f1, (struct point3){0, -1, 0}, 
+			   'B');
+	plane_init(&(template_e.internal[1]), 
+	           e2, b2, f2, (struct point3){0, 1, 0}, 
+			   'B');
+	rotate_edge_ang(&template_e, 0, PI, 0);
+
+
+	// Init the top ring of edges around white center
+	for (int i = 0; i < 4; i++) {
+		edge_p_copy(&template_e, &(c->edges[i]));
+		rotate_edge_ang(&template_e, 0, -0.5 * PI, 0);
+	}
+	rotate_edge_ang(&template_e, 0, 0, 0.5 * PI);
+
+	// Init the middle ring of edges
+	for (int i = 4; i < 8; i++) {
+		edge_p_copy(&template_e, &(c->edges[i]));
+		rotate_edge_ang(&template_e, 0, -0.5 * PI, 0);
+	}
+	rotate_edge_ang(&template_e, 0, 0, 0.5 * PI);
+
+	// Init the bottom ring of edges around yellow center
+	for (int i = 8; i < 12; i++) {
+		edge_p_copy(&template_e, &(c->edges[i]));
+		rotate_edge_ang(&template_e, 0, -0.5 * PI, 0);
+	}
+}
 
 void corner_init(struct corner_p* c, struct point3 center) {
 	// Inits the face planes
@@ -88,7 +270,7 @@ void cube_init(struct cube* c) {
 	}
 
 	// Inits all edges
-	struct edge_p edges[12];
+	all_edge_init(c);
 
 	// Inits the centers
 	double th_psize = 3.0 / 2.0 * piece_size;

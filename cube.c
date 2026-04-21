@@ -17,10 +17,6 @@ clock_t temp;
 clock_t calc_temp;
 clock_t static_temp;
 
-double UD_ang = 0.032341; // Up down
-double LR_ang = 0.014321; // Left right
-double ROT_ang = 0.041231; // Grab and spin left right
-
 int width = 160, height = 50;
 double zBuffer[160 * 50];
 char buffer[160 * 50];
@@ -42,6 +38,13 @@ void char_to_col(char ch) {
 	int escape_c[7] = {34, 35, 32, 31, 33, 30, 37};
 	int i = 0;
 
+  if (ch == 'o') {
+    	sprintf(color_buffer + color_buf_itr, "\033[38;5;214m|");
+      color_buf_itr += 12;
+      prev_char = ch;
+      return;
+  }
+
 	while(colors[i] != ch) {
 		i++;
 	}
@@ -51,76 +54,40 @@ void char_to_col(char ch) {
   prev_char = ch;
 }
 
-double calculateX(struct point3* pt, double B, double C, double A) {
-  double i = pt->x;
-  double j = pt->y;
-  double k = pt->z;
-  return j * sin(A) * sin(B) * cos(C) + k * cos(A) * sin(B) * cos(C) -
-         j * cos(A) * sin(C) + k * sin(A) * sin(C) + i * cos(B) * cos(C);
-}
-
-double calculateY(struct point3* pt, double B, double C, double A) {
-  double i = pt->x;
-  double j = pt->y;
-  double k = pt->z;
-  return j * cos(A) * cos(C) - k * sin(A) * cos(C) +
-         j * sin(A) * sin(B) * sin(C) + k * cos(A) * sin(B) * sin(C) +
-         i * cos(B) * sin(C);
-}
-
-double calculateZ(struct point3* pt, double B, double C, double A) {
-  double i = pt->x;
-  double j = pt->y;
-  double k = pt->z;
-  return k * cos(A) * cos(B) + j * sin(A) * cos(B) - i * sin(B);
-}
-
-// rotates a point pt around the normal (unit) vector cw t radians
-void rotate_around_normal(struct point3* pt, struct point3 nor, double t) {
-  double i = pt->x;
-  double j = pt->y;
-  double k = pt->z;
-
-  double ux = nor.x;
-  double uy = nor.y;
-  double uz = nor.z;
-
-  double st = sin(t);
-  double ct = cos(t);
-  double mct = 1 - ct;
-
-  pt->x = i * (ux * ux * mct + ct) + j * (ux * uy * mct - uz * st) + k * (ux * uz * mct + uy * st);
-  pt->y = i * (ux * uy * mct + uz * st) + j * (uy * uy * mct + ct) + k * (uy * uz * mct - ux * st);
-  pt->z = i * (ux * uz * mct - uy * st) + j * (uy * uz * mct + ux * st) + k * (uz * uz * mct + ct);
-}
-
 void move_R(struct cube* c) {
-  // Rotate corners
   int c_idx[4] = {1, 2, 5, 6};
+  int e_idx[4] = {1, 5, 6, 9};
   struct point3 normal = c->normals[1];
+
+  // Rotate corners
   for (int i = 0; i < 4; i++) {
     struct corner_p* cor = &(c->corners[c_idx[i]]);
     for (int j = 0; j < 3; j++) {
       struct plane* cur_plane = &(cor->face[j]);
-      rotate_around_normal(&(cur_plane->corner), normal, -PI / 12);
-      rotate_around_normal(&(cur_plane->vertex[0]), normal, -PI / 12);
-      rotate_around_normal(&(cur_plane->vertex[1]), normal, -PI / 12);
-      rotate_around_normal(&(cur_plane->normal), normal, -PI / 12);
+      rotate_plane_around_normal(cur_plane, normal, -PI / 12);
     }
     for (int j = 0; j < 3; j++) {
       struct plane* cur_plane = &(cor->internal[j]);
-      rotate_around_normal(&(cur_plane->corner), normal, -PI / 12);
-      rotate_around_normal(&(cur_plane->vertex[0]), normal, -PI / 12);
-      rotate_around_normal(&(cur_plane->vertex[1]), normal, -PI / 12);
-      rotate_around_normal(&(cur_plane->normal), normal, -PI / 12);
+      rotate_plane_around_normal(cur_plane, normal, -PI / 12);
+    }
+  }
+
+  // Rotate edegs
+  for (int i = 0; i < 4; i++) {
+    struct edge_p* edge = &(c->edges[e_idx[i]]);
+    for (int j = 0; j < 2; j++) {
+      struct plane* cur_plane = &(edge->face[j]);
+      rotate_plane_around_normal(cur_plane, normal, -PI / 12);
+    }
+    for (int j = 0; j < 2; j++) {
+      struct plane* cur_plane = &(edge->internal[j]);
+      rotate_plane_around_normal(cur_plane, normal, -PI / 12);
     }
   }
 
   // Rotate center
   struct plane* center_pl = &(c->centers[2]);
-  rotate_around_normal(&(center_pl->corner), normal, -PI / 12);
-  rotate_around_normal(&(center_pl->vertex[0]), normal, -PI / 12);
-  rotate_around_normal(&(center_pl->vertex[1]), normal, -PI / 12);
+  rotate_plane_around_normal(center_pl, normal, -PI / 12);
 }
 
 void add_color_char(char ch) {
@@ -199,8 +166,8 @@ void render_plane(struct plane* p) {
 			struct point3 cur_pt = grid_points[i][j];
       
       // If its on the border of the plane, color it a different color
-      if (i == 0 || j == 0 || j == len || i == len) {
-        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, 'w');
+      if (i <= 0.05 * len || j <= 0.05 * len || j >= 0.95 * len || i >= 0.95 * len) {
+        calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, 'B');
       } else {
         calculateForStaticSurface(cur_pt.x, cur_pt.y, cur_pt.z, p->symbol);
       }
@@ -213,73 +180,6 @@ void render_plane(struct plane* p) {
   free(grid_points);
 }
 
-void rotate_point(struct point3* pt, double UD, double LR, double ROT) {
-  *pt = (struct point3){calculateX(pt, UD, LR, ROT), 
-                        calculateY(pt, UD, LR, ROT), 
-                        calculateZ(pt, UD, LR, ROT)};
-}
-
-void rotate_plane(struct plane* p) {
-  rotate_point(&(p->corner), UD_ang, LR_ang, ROT_ang);
-  rotate_point(&(p->vertex[0]), UD_ang, LR_ang, ROT_ang);
-  rotate_point(&(p->vertex[1]), UD_ang, LR_ang, ROT_ang);
-  rotate_point(&(p->normal), UD_ang, LR_ang, ROT_ang);
-}
-
-void rotate_cube_ang(struct cube* c, double UD, double LR, double ROT) {
-  double t1 = UD_ang;
-  double t2 = LR_ang;
-  double t3 = ROT_ang;
-  UD_ang = UD;
-  LR_ang = LR;
-  ROT_ang = ROT;
-
-  // Rotates all corners
-  for (int i = 0; i < 8; i++) {
-    // Rotates all planes in a corner
-    struct corner_p* cor = &(c->corners[i]);
-    for (int j = 0; j < 3; j++) {
-      rotate_plane(&(cor->face[j]));
-    }
-    for (int j = 0; j < 3; j++) {
-      rotate_plane(&(cor->internal[j]));
-    }
-  }
-
-  // Rotate all centers
-  for (int i = 0; i < 6; i++) {
-    rotate_plane(&(c->centers[i]));
-  }
-
-  UD_ang = t1;
-  LR_ang = t2;
-  ROT_ang = t3;
-}
-
-void rotate_cube(struct cube* c) {
-  // Rotates all corners
-  for (int i = 0; i < 8; i++) {
-    // Rotates all planes in a corner
-    struct corner_p* cor = &(c->corners[i]);
-    for (int j = 0; j < 3; j++) {
-      rotate_plane(&(cor->face[j]));
-    }
-    for (int j = 0; j < 3; j++) {
-      rotate_plane(&(cor->internal[j]));
-    }
-  }
-
-  // Rotate all centers
-  for (int i = 0; i < 6; i++) {
-    rotate_plane(&(c->centers[i]));
-  }
-
-  // Rotates all normals
-  for (int i = 0; i < 3; i++) {
-    rotate_point(&(c->normals[i]), UD_ang, LR_ang, ROT_ang);
-  }
-}
-
 void render_cube(struct cube* c) {
   // Render all corners
   for (int i = 0; i < 8; i++) {
@@ -290,6 +190,18 @@ void render_cube(struct cube* c) {
     }
     for (int j = 0; j < 3; j++) {
       render_plane(&(cor->internal[j]));
+    }
+  }
+
+  // Render all edges
+  for (int i = 0; i < 12; i++) {
+    // Renders all planes in a corner
+    struct edge_p* edge = &(c->edges[i]);
+    for (int j = 0; j < 2; j++) {
+      render_plane(&(edge->face[j]));
+    }
+    for (int j = 0; j < 2; j++) {
+      render_plane(&(edge->internal[j]));
     }
   }
 

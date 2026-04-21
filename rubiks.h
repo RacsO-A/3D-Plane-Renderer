@@ -1,4 +1,4 @@
-#include "gridify.h"
+#include "rotate.h"
 #define piece_size 5.0f
 
 struct plane {
@@ -46,7 +46,11 @@ struct cube {
 	int is_static;
 };
 
+void rotate_plane_around_normal(struct plane*, struct point3, double);
+void rotate_plane(struct plane*);
+void rotate_cube_ang(struct cube*, double, double, double);
+void rotate_cube(struct cube*);
 void plane_init(struct plane*, struct point3, struct point3, struct point3, struct point3, char);
-void edge_init(struct edge_p*, struct point3);
+void all_edge_init(struct cube*);
 void corner_init(struct corner_p*, struct point3);
 void cube_init(struct cube*);
