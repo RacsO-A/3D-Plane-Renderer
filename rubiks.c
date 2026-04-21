@@ -56,6 +56,11 @@ void rotate_cube_ang(struct cube* c, double UD, double LR, double ROT) {
 		rotate_plane(&(c->centers[i]));
 	}
 
+	// Rotates all normals
+	for (int i = 0; i < 6; i++) {
+		rotate_point(&(c->normals[i]), UD_ang, LR_ang, ROT_ang);
+	}
+
 	UD_ang = t1;
 	LR_ang = t2;
 	ROT_ang = t3;
@@ -92,7 +97,7 @@ void rotate_cube(struct cube* c) {
 	}
 
 	// Rotates all normals
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 6; i++) {
 		rotate_point(&(c->normals[i]), UD_ang, LR_ang, ROT_ang);
 	}
 }
@@ -283,6 +288,9 @@ void cube_init(struct cube* c) {
 
 	// Inits the normals
 	c->normals[0] = (struct point3){0, 0, 1};
-	c->normals[1] = (struct point3){0, 1, 0};
-	c->normals[2] = (struct point3){1, 0, 0};
+	c->normals[1] = (struct point3){-1, 0, 0};
+	c->normals[2] = (struct point3){0, 1, 0};
+	c->normals[3] = (struct point3){1, 0, 0};
+	c->normals[4] = (struct point3){0, -1, 0};
+	c->normals[5] = (struct point3){0, 0, -1};
 }

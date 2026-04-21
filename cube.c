@@ -8,6 +8,22 @@
 #define _GNU_SOURCE
 #define PI 3.14159265359f
 
+// Cubing variables
+// Edge and corner indexs associated with each 
+// turn in order: U, D, L, R, B, F: in clockwise order
+// looking from the outside to in
+const int edge_idxs[6][4] = {{0, 1, 2, 3}, {11, 10, 9, 8},
+                             {3, 7, 11, 4}, {1, 5, 9, 6},
+                             {0, 4, 8, 5}, {2, 6, 10, 7}};
+const int corner_idxs[6][4] = {{0, 1, 2, 3}, {7, 6, 5, 4},
+                               {0, 3, 7, 4}, {2, 1, 5, 6},
+                               {1, 0, 4, 5}, {3, 2, 6, 7}};
+const char* valid_moves[18] = {"U", "U'", "2U", "D", "D'", "2D",
+                               "L", "L'", "2L", "R", "R'", "2R",
+                               "B", "B'", "2B", "F", "F'", "2F"};
+const int frames_per_turn = 12;
+
+// Timing variables
 double print_time = 0;
 double calc_time = 0;
 double total_time = 0;
@@ -17,6 +33,7 @@ clock_t temp;
 clock_t calc_temp;
 clock_t static_temp;
 
+// Rendering variables
 int width = 160, height = 50;
 double zBuffer[160 * 50];
 char buffer[160 * 50];
@@ -25,12 +42,15 @@ int color_buf_itr = 0;
 int backgroundASCIICode = ' ';
 int distanceFromCam = 40;
 double K1 = 60;
-int prev_char = ' ';
-
 double x, y, z;
 double oox;
 int xp, yp;
 int idx;
+
+// Printing variables
+int prev_char = ' ';
+char cur_move[3] = "";
+int frame_left_for_turn = 0;
 
 const char colors[7] = {'b', 'o', 'g', 'r', 'y', 'B', 'w'}; 
 
@@ -54,21 +74,64 @@ void char_to_col(char ch) {
   prev_char = ch;
 }
 
-void move_R(struct cube* c) {
-  int c_idx[4] = {1, 2, 5, 6};
-  int e_idx[4] = {1, 5, 6, 9};
-  struct point3 normal = c->normals[1];
+// Returns 1 if input is a valid move
+int is_valid_move(char* move) {
+  for (int i = 0; i < 18; i++) {
+    if (!strcmp(valid_moves[i], move)) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+// Gets the base movement from a move, R, L, U, D, B, or F
+char get_base_move(char* move) {
+  if (move[0] == '2') {
+    return move[1];
+  } else {
+    return move[0];
+  }
+}
+
+void update_move_idxs(char base_move, int edge_idx[4], int corner_idx[4]) {
+  int idx;
+  if (base_move == 'U') {
+    idx = 0;
+  } else if (base_move == 'D') {
+    idx = 1;
+  } else if (base_move == 'L') {
+    idx = 2;
+  } else if (base_move == 'R') {
+    idx = 3;    
+  } else if (base_move == 'B') {
+    idx = 4;    
+  } else if (base_move == 'F') {
+    idx = 5;    
+  }
+
+  for (int i = 0; i < 4; i++) {
+    edge_idx[i] = edge_idxs[idx][i];
+    corner_idx[i] = corner_idxs[idx][i];
+  }
+}
+
+// TODO Make this better
+void arb_move(struct cube* c, int e_idx[4], int c_idx[4], int normal_idx, int back, int double_m) {
+  int reps = (back == 1 ? 3 : (double_m == 1 ? 2 : 1));
+  int back_n = (back == 1 ? -1 : 1);
+  float rot_step = back_n * (double_m + 1) * PI / (2 * frames_per_turn);
+  struct point3 normal = c->normals[normal_idx];
 
   // Rotate corners
   for (int i = 0; i < 4; i++) {
     struct corner_p* cor = &(c->corners[c_idx[i]]);
     for (int j = 0; j < 3; j++) {
       struct plane* cur_plane = &(cor->face[j]);
-      rotate_plane_around_normal(cur_plane, normal, -PI / 12);
+      rotate_plane_around_normal(cur_plane, normal, -rot_step);
     }
     for (int j = 0; j < 3; j++) {
       struct plane* cur_plane = &(cor->internal[j]);
-      rotate_plane_around_normal(cur_plane, normal, -PI / 12);
+      rotate_plane_around_normal(cur_plane, normal, -rot_step);
     }
   }
 
@@ -77,17 +140,85 @@ void move_R(struct cube* c) {
     struct edge_p* edge = &(c->edges[e_idx[i]]);
     for (int j = 0; j < 2; j++) {
       struct plane* cur_plane = &(edge->face[j]);
-      rotate_plane_around_normal(cur_plane, normal, -PI / 12);
+      rotate_plane_around_normal(cur_plane, normal, -rot_step);
     }
     for (int j = 0; j < 2; j++) {
       struct plane* cur_plane = &(edge->internal[j]);
-      rotate_plane_around_normal(cur_plane, normal, -PI / 12);
+      rotate_plane_around_normal(cur_plane, normal, -rot_step);
     }
   }
 
   // Rotate center
-  struct plane* center_pl = &(c->centers[2]);
-  rotate_plane_around_normal(center_pl, normal, -PI / 12);
+  struct plane* center_pl = &(c->centers[normal_idx]);
+  rotate_plane_around_normal(center_pl, normal, -rot_step);
+}
+
+int get_normal_idx_from_move(struct cube* c, char base_move) {
+  int idx;
+  if (base_move == 'U') {
+    idx = 0;
+  } else if (base_move == 'D') {
+    idx = 5;
+  } else if (base_move == 'L') {
+    idx = 4;
+  } else if (base_move == 'R') {
+    idx = 2;    
+  } else if (base_move == 'B') {
+    idx = 1;    
+  } else if (base_move == 'F') {
+    idx = 3;    
+  }
+  return idx;
+}
+
+void do_move(struct cube* c, char* move) {
+  if (!is_valid_move(move)) {
+        return;
+  }
+
+  int double_move = 0;
+  if (move[0] == '2') {
+    double_move = 1;
+  }
+
+  int back_move = 0;
+  if (move[1] == '\'') {
+    back_move = 1;
+  }
+
+  char base_move = get_base_move(move);
+  int normal_idx = get_normal_idx_from_move(c, base_move);
+
+  int edge_idx[4];
+  int cor_idx[4];
+  update_move_idxs(base_move, edge_idx, cor_idx);
+
+  arb_move(c, edge_idx, cor_idx, normal_idx, back_move, double_move);
+
+  frame_left_for_turn--;
+  if (!frame_left_for_turn) {
+    int reps = (back_move == 1 ? 3 : (double_move == 1 ? 2 : 1));
+    
+    // Rearange the edges
+    for (int i = 0; i < reps; i++) {
+      struct edge_p temp = c->edges[edge_idx[3]];
+      for (int j = 3; j > 0; j--) {
+        c->edges[edge_idx[j]] = c->edges[edge_idx[j - 1]];
+      }
+      c->edges[edge_idx[0]] = temp;
+    }
+
+    // Rearange the corners
+    for (int i = 0; i < reps; i++) {
+      struct corner_p temp = c->corners[cor_idx[3]];
+      for (int j = 3; j > 0; j--) {
+        c->corners[cor_idx[j]] = c->corners[cor_idx[j - 1]];
+      }
+      c->corners[cor_idx[0]] = temp;
+    }
+
+    strcpy(cur_move, "");
+  }
 }
 
 void add_color_char(char ch) {
@@ -211,13 +342,38 @@ void render_cube(struct cube* c) {
   }
 }
 
+void move_tick(struct cube* c, char* move, int* itr) {
+  // If done with moves
+  if (!strcmp(cur_move, "Done")) {
+
+  // Else if cur_move is not empty
+  } else if (strcmp(cur_move, "")) {
+    // Do a frame advance of it
+    do_move(c, cur_move);
+  } else {
+    // Start next move
+    frame_left_for_turn = frames_per_turn;
+    strcpy(cur_move, move);
+    (*itr)++;
+    if (*itr == 18) {
+      *itr = 0;
+    }
+    do_move(c, cur_move);
+  }
+}
+
 int main() {
   total_time = clock();
   printf("\x1b[2J");
   
   struct cube c;
   cube_init(&c);
+  rotate_cube(&c);
   int main_itr = 0;
+  int moves_itr = 0;
+  char* moves[18] = {"U", "U'", "2U", "D", "D'", "2D",
+                     "L", "L'", "2L", "R", "R'", "2R",
+                     "B", "B'", "2B", "F", "F'", "2F"};
 
   while (main_itr <= 12 * 20) {
     memset(buffer, backgroundASCIICode, width * height);
@@ -228,10 +384,10 @@ int main() {
     calc_temp = clock();
     render_cube(&c);
     render_time += (double)(clock() - calc_temp) / CLOCKS_PER_SEC;
-
+    
     calc_temp = clock();
-    move_R(&c);
     rotate_cube(&c);
+    move_tick(&c, moves[rand() % 18], &moves_itr);
     calc_time += (double)(clock() - calc_temp) / CLOCKS_PER_SEC;
 
     printf("\x1b[H");
