@@ -21,7 +21,7 @@ const int corner_idxs[6][4] = {{0, 1, 2, 3}, {7, 6, 5, 4},
 const char* valid_moves[18] = {"U", "U'", "2U", "D", "D'", "2D",
                                "L", "L'", "2L", "R", "R'", "2R",
                                "B", "B'", "2B", "F", "F'", "2F"};
-const int frames_per_turn = 12;
+const int frames_per_turn = 24;
 
 // Timing variables
 double print_time = 0;
@@ -34,13 +34,14 @@ clock_t calc_temp;
 clock_t static_temp;
 
 // Rendering variables
-int width = 160, height = 50;
-double zBuffer[160 * 50];
-char buffer[160 * 50];
-char color_buffer[160 * 50 * 10];
+int width = 160, height = 80;
+double zBuffer[160 * 80];
+char buffer[160 * 80];
+char color_buffer[160 * 80 * 10];
 int color_buf_itr = 0;
 int backgroundASCIICode = ' ';
-int distanceFromCam = 40;
+char foreground_ch = '|';
+int distanceFromCam = 50;
 double K1 = 60;
 double x, y, z;
 double oox;
@@ -49,17 +50,17 @@ int idx;
 
 // Printing variables
 int prev_char = ' ';
-char cur_move[3] = "";
+char cur_move[6] = "";
 int frame_left_for_turn = 0;
 
 const char colors[7] = {'b', 'o', 'g', 'r', 'y', 'B', 'w'}; 
 
 void char_to_col(char ch) {
-	int escape_c[7] = {34, 35, 32, 31, 33, 30, 37};
+	int escape_c[7] = {94, 95, 92, 91, 93, 90, 97};
 	int i = 0;
 
   if (ch == 'o') {
-    	sprintf(color_buffer + color_buf_itr, "\033[38;5;214m|");
+    	sprintf(color_buffer + color_buf_itr, "\033[38;5;214m%c", foreground_ch);
       color_buf_itr += 12;
       prev_char = ch;
       return;
@@ -69,7 +70,7 @@ void char_to_col(char ch) {
 		i++;
 	}
 
-	sprintf(color_buffer + color_buf_itr, "\033[%im|", escape_c[i]);
+	sprintf(color_buffer + color_buf_itr, "\033[%im%c", escape_c[i], foreground_ch);
   color_buf_itr += 6;
   prev_char = ch;
 }
@@ -225,8 +226,10 @@ void add_color_char(char ch) {
     if (ch == ' ' || ch == '\n') {
 	      color_buffer[color_buf_itr] = ch;
         color_buf_itr++;
+        //sprintf(color_buffer + color_buf_itr, "\033[49m%c", ch);
+        //color_buf_itr += 6;
     } else if (ch == prev_char) {
-      	color_buffer[color_buf_itr] = '|';
+      	color_buffer[color_buf_itr] = foreground_ch;
         color_buf_itr++;
     } else {
         char_to_col(ch);
@@ -345,20 +348,31 @@ void render_cube(struct cube* c) {
 void move_tick(struct cube* c, char* move, int* itr) {
   // If done with moves
   if (!strcmp(cur_move, "Done")) {
-
+    return;
+    
   // Else if cur_move is not empty
   } else if (strcmp(cur_move, "")) {
     // Do a frame advance of it
     do_move(c, cur_move);
+  
+  // Start next move
   } else {
-    // Start next move
     frame_left_for_turn = frames_per_turn;
     strcpy(cur_move, move);
     (*itr)++;
-    if (*itr == 18) {
-      *itr = 0;
-    }
     do_move(c, cur_move);
+  }
+}
+
+void setup(struct cube* c) {
+  int scamble_idx = 0;
+  char* scramble[20] = {"2B", "L'", "U'", "2F", "B'", "U'",
+                     "L", "2F", "2R", "2L", "F'", "2L", 
+                     "B", "2R", "2U", "2B", "2D", "B", 
+                     "2L", "U"};
+  while (scamble_idx < 20) {
+    //printf("A");
+    move_tick(c, scramble[scamble_idx], &scamble_idx);
   }
 }
 
@@ -369,13 +383,19 @@ int main() {
   struct cube c;
   cube_init(&c);
   rotate_cube(&c);
+  setup(&c);
   int main_itr = 0;
-  int moves_itr = 0;
+  int moves_itr = -1;
+  /*
   char* moves[18] = {"U", "U'", "2U", "D", "D'", "2D",
                      "L", "L'", "2L", "R", "R'", "2R",
-                     "B", "B'", "2B", "F", "F'", "2F"};
+                     "B", "B'", "2B", "F", "F'", "2F"};*/
+  char* moves[20] = {"U'", "2L", "B'", "2D", "2B", "2U",
+                     "2R", "B'", "2L", "F", "2L", "2R",
+                     "2F", "L'", "U", "B", "2F", "U",
+                     "L", "2B"};
 
-  while (main_itr <= 12 * 20) {
+  while (main_itr <= 12 * 48) {
     memset(buffer, backgroundASCIICode, width * height);
     memset(zBuffer, 0, width * height * 8);
     memset(color_buffer, backgroundASCIICode, width * height * 10);
@@ -387,7 +407,11 @@ int main() {
     
     calc_temp = clock();
     rotate_cube(&c);
-    move_tick(&c, moves[rand() % 18], &moves_itr);
+    if (moves_itr < 20) {
+      move_tick(&c, moves[moves_itr], &moves_itr);
+    } else {
+      move_tick(&c, "Deone", &moves_itr);
+    }
     calc_time += (double)(clock() - calc_temp) / CLOCKS_PER_SEC;
 
     printf("\x1b[H");
@@ -414,7 +438,7 @@ int main() {
     }
     */
 
-    usleep(45000);
+    usleep(25000);
     main_itr++;
   }
   printf("\033[0m");

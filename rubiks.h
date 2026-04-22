@@ -1,5 +1,5 @@
 #include "rotate.h"
-#define piece_size 5.0f
+#define piece_size 8.0f
 
 struct plane {
 	struct point3 corner;

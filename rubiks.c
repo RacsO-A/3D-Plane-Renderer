@@ -1,9 +1,9 @@
 #include "rubiks.h"
 #define PI 3.14159265359f
 
-double UD_ang = 0.032341; // Up down
-double LR_ang = 0.014321; // Left right
-double ROT_ang = 0.041231; // Grab and spin left right
+double UD_ang = 0.0162342; // Up down
+double LR_ang = 0.00712312; // Left right
+double ROT_ang = 0.020612312; // Grab and spin left right
 
 void rotate_plane_around_normal(struct plane* p, struct point3 nor, double t) {
     rotate_around_normal(&(p->corner), nor, t);
@@ -263,6 +263,46 @@ void corner_init(struct corner_p* c, struct point3 center) {
 	}
 }
 
+void edge_replace_color(struct edge_p* e, char c1, char c2) {
+	e->face[0].symbol = c1;
+	e->face[1].symbol = c2;
+}
+
+void edge_init_all_colors(struct cube* c) {
+	edge_replace_color(&(c->edges[0]), 'w', 'b');
+	edge_replace_color(&(c->edges[1]), 'w', 'r');
+	edge_replace_color(&(c->edges[2]), 'w', 'g');
+	edge_replace_color(&(c->edges[3]), 'w', 'o');
+
+	edge_replace_color(&(c->edges[4]), 'o', 'b');
+	edge_replace_color(&(c->edges[5]), 'b', 'r');
+	edge_replace_color(&(c->edges[6]), 'r', 'g');
+	edge_replace_color(&(c->edges[7]), 'g', 'o');
+	
+	edge_replace_color(&(c->edges[8]), 'y', 'b');
+	edge_replace_color(&(c->edges[9]), 'y', 'r');
+	edge_replace_color(&(c->edges[10]), 'y', 'g');
+	edge_replace_color(&(c->edges[11]), 'y', 'o');
+}
+
+void corner_replace_color(struct corner_p* c, char c1, char c2, char c3) {
+	c->face[0].symbol = c1;
+	c->face[1].symbol = c2;
+	c->face[2].symbol = c3;
+}
+
+void corner_init_all_colors(struct cube* c) {
+	corner_replace_color(&(c->corners[0]), 'w', 'b', 'o');
+	corner_replace_color(&(c->corners[1]), 'w', 'b', 'r');
+	corner_replace_color(&(c->corners[2]), 'w', 'g', 'r');
+	corner_replace_color(&(c->corners[3]), 'w', 'g', 'o');
+
+	corner_replace_color(&(c->corners[4]), 'y', 'b', 'o');
+	corner_replace_color(&(c->corners[5]), 'y', 'b', 'r');
+	corner_replace_color(&(c->corners[6]), 'y', 'g', 'r');
+	corner_replace_color(&(c->corners[7]), 'y', 'g', 'o');
+}
+
 void cube_init(struct cube* c) {
     c->is_static = 1;
 
@@ -273,9 +313,11 @@ void cube_init(struct cube* c) {
 										   (struct point3){template[i % 4], template[(i + 1) % 4], i < 4 ? 1 : -1});
 		corner_init(&(c->corners[i]), center);
 	}
+	corner_init_all_colors(c);
 
 	// Inits all edges
 	all_edge_init(c);
+	edge_init_all_colors(c);
 
 	// Inits the centers
 	double th_psize = 3.0 / 2.0 * piece_size;
