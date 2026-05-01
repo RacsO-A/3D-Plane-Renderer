@@ -22,7 +22,7 @@ struct edge_p {
 
 // Green front white top
 // corners and edges are in order from:
-// top to bottom, tr clockwise
+// top to bottom, tl clockwise
 // centers are top to bottom, tr clockwise
 struct cube {
 	// normal unit vectors to top, back, right, front, left, bottom
